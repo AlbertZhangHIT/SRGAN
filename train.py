@@ -20,28 +20,31 @@ parser.add_argument('--crop_size', default=88, type=int, help='training images c
 parser.add_argument('--upscale_factor', default=4, type=int, choices=[2, 4, 8],
                     help='super resolution upscale factor')
 parser.add_argument('--num_epochs', default=100, type=int, help='train epoch number')
+parser.add_argument('--cuda', type=int, required=True, help="set to 1 for running on GPU, 0 for CPU")
 
 opt = parser.parse_args()
 
 CROP_SIZE = opt.crop_size
 UPSCALE_FACTOR = opt.upscale_factor
 NUM_EPOCHS = opt.num_epochs
-
+if opt.cuda and not torch.cuda.is_available():
+  print("ERROR: cuda is not available, try running on CPU")
+  sys.exit(1)
+device = torch.device("cuda" if opt.cuda else "cpu")
+  
 train_set = TrainDatasetFromFolder('data/VOC2012/train', crop_size=CROP_SIZE, upscale_factor=UPSCALE_FACTOR)
 val_set = ValDatasetFromFolder('data/VOC2012/val', upscale_factor=UPSCALE_FACTOR)
 train_loader = DataLoader(dataset=train_set, num_workers=4, batch_size=64, shuffle=True)
 val_loader = DataLoader(dataset=val_set, num_workers=4, batch_size=1, shuffle=False)
 
-netG = Generator(UPSCALE_FACTOR)
+netG = Generator(UPSCALE_FACTOR).to(device)
 print('# generator parameters:', sum(param.numel() for param in netG.parameters()))
-netD = Discriminator()
+netD = Discriminator().to(device)
 print('# discriminator parameters:', sum(param.numel() for param in netD.parameters()))
 
 generator_criterion = GeneratorLoss()
 
 if torch.cuda.is_available():
-    netG.cuda()
-    netD.cuda()
     generator_criterion.cuda()
 
 optimizerG = optim.Adam(netG.parameters())
@@ -63,12 +66,8 @@ for epoch in range(1, NUM_EPOCHS + 1):
         ############################
         # (1) Update D network: maximize D(x)-1-D(G(z))
         ###########################
-        real_img = Variable(target)
-        if torch.cuda.is_available():
-            real_img = real_img.cuda()
-        z = Variable(data)
-        if torch.cuda.is_available():
-            z = z.cuda()
+        real_img = target.to(device)
+        z = data.to(device)
         fake_img = netG(z)
 
         netD.zero_grad()
@@ -89,9 +88,9 @@ for epoch in range(1, NUM_EPOCHS + 1):
         fake_out = netD(fake_img).mean()
 
         g_loss = generator_criterion(fake_out, fake_img, real_img)
-        running_results['g_loss'] += g_loss.data[0] * batch_size
+        running_results['g_loss'] += g_loss.data.item() * batch_size
         d_loss = 1 - real_out + fake_out
-        running_results['d_loss'] += d_loss.data[0] * batch_size
+        running_results['d_loss'] += d_loss.data.item() * batch_size
         running_results['d_score'] += real_out.data[0] * batch_size
         running_results['g_score'] += fake_out.data[0] * batch_size
 
