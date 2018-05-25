@@ -1,12 +1,12 @@
 import argparse
 import os
 from math import log10
+import numpy as np
 
 import pandas as pd
 import torch.optim as optim
 import torch.utils.data
 import torchvision.utils as utils
-from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -31,6 +31,9 @@ if opt.cuda and not torch.cuda.is_available():
   print("ERROR: cuda is not available, try running on CPU")
   sys.exit(1)
 device = torch.device("cuda" if opt.cuda else "cpu")
+seed = 1000
+np.random.seed(seed)
+torch.manual_seed(seed)
   
 train_set = TrainDatasetFromFolder('data/VOC2012/train', crop_size=CROP_SIZE, upscale_factor=UPSCALE_FACTOR)
 val_set = ValDatasetFromFolder('data/VOC2012/val', upscale_factor=UPSCALE_FACTOR)
@@ -91,8 +94,8 @@ for epoch in range(1, NUM_EPOCHS + 1):
         running_results['g_loss'] += g_loss.data.item() * batch_size
         d_loss = 1 - real_out + fake_out
         running_results['d_loss'] += d_loss.data.item() * batch_size
-        running_results['d_score'] += real_out.data[0] * batch_size
-        running_results['g_score'] += fake_out.data[0] * batch_size
+        running_results['d_score'] += real_out.data.item() * batch_size
+        running_results['g_score'] += fake_out.data.item() * batch_size
 
         train_bar.set_description(desc='[%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f' % (
             epoch, NUM_EPOCHS, running_results['d_loss'] / running_results['batch_sizes'],
@@ -107,37 +110,36 @@ for epoch in range(1, NUM_EPOCHS + 1):
     val_bar = tqdm(val_loader)
     valing_results = {'mse': 0, 'ssims': 0, 'psnr': 0, 'ssim': 0, 'batch_sizes': 0}
     val_images = []
-    for val_lr, val_hr_restore, val_hr in val_bar:
-        batch_size = val_lr.size(0)
-        valing_results['batch_sizes'] += batch_size
-        lr = Variable(val_lr, volatile=True)
-        hr = Variable(val_hr, volatile=True)
-        if torch.cuda.is_available():
-            lr = lr.cuda()
-            hr = hr.cuda()
-        sr = netG(lr)
+    
+	with torch.no_grad():
+    	for val_lr, val_hr_restore, val_hr in val_bar:
+        	batch_size = val_lr.size(0)
+        	valing_results['batch_sizes'] += batch_size
+        	lr = val_lr.to(device)
+        	hr = val_hr.to(device)
+        	sr = netG(lr)
 
-        batch_mse = ((sr - hr) ** 2).data.mean()
-        valing_results['mse'] += batch_mse * batch_size
-        batch_ssim = pytorch_ssim.ssim(sr, hr).data[0]
-        valing_results['ssims'] += batch_ssim * batch_size
-        valing_results['psnr'] = 10 * log10(1 / (valing_results['mse'] / valing_results['batch_sizes']))
-        valing_results['ssim'] = valing_results['ssims'] / valing_results['batch_sizes']
-        val_bar.set_description(
-            desc='[converting LR images to SR images] PSNR: %.4f dB SSIM: %.4f' % (
-                valing_results['psnr'], valing_results['ssim']))
+        	batch_mse = ((sr - hr) ** 2).data.mean()
+        	valing_results['mse'] += batch_mse * batch_size
+        	batch_ssim = pytorch_ssim.ssim(sr, hr).data[0]
+        	valing_results['ssims'] += batch_ssim * batch_size
+        	valing_results['psnr'] = 10 * log10(1 / (valing_results['mse'] / valing_results['batch_sizes']))
+        	valing_results['ssim'] = valing_results['ssims'] / valing_results['batch_sizes']
+        	val_bar.set_description(
+            	desc='[converting LR images to SR images] PSNR: %.4f dB SSIM: %.4f' % (
+                	valing_results['psnr'], valing_results['ssim']))
 
-        val_images.extend(
-            [display_transform()(val_hr_restore.squeeze(0)), display_transform()(hr.data.cpu().squeeze(0)),
-             display_transform()(sr.data.cpu().squeeze(0))])
-    val_images = torch.stack(val_images)
-    val_images = torch.chunk(val_images, val_images.size(0) // 15)
-    val_save_bar = tqdm(val_images, desc='[saving training results]')
-    index = 1
-    for image in val_save_bar:
-        image = utils.make_grid(image, nrow=3, padding=5)
-        utils.save_image(image, out_path + 'epoch_%d_index_%d.png' % (epoch, index), padding=5)
-        index += 1
+        	val_images.extend(
+            	[display_transform()(val_hr_restore.squeeze(0)), display_transform()(hr.data.cpu().squeeze(0)),
+             	display_transform()(sr.data.cpu().squeeze(0))])
+    	val_images = torch.stack(val_images)
+    	val_images = torch.chunk(val_images, val_images.size(0) // 15)
+    	val_save_bar = tqdm(val_images, desc='[saving training results]')
+    	index = 1
+    	for image in val_save_bar:
+        	image = utils.make_grid(image, nrow=3, padding=5)
+        	utils.save_image(image, out_path + 'epoch_%d_index_%d.png' % (epoch, index), padding=5)
+        	index += 1
 
     # save model parameters
     torch.save(netG.state_dict(), 'epochs/netG_epoch_%d_%d.pth' % (UPSCALE_FACTOR, epoch))
