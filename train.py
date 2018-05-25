@@ -117,7 +117,7 @@ for epoch in range(1, NUM_EPOCHS + 1):
         	valing_results['batch_sizes'] += batch_size
         	lr = val_lr.to(device)
         	hr = val_hr.to(device)
-        	sr = netG(lr)
+        	sr = netG(lr) 
 
         	batch_mse = ((sr - hr) ** 2).data.mean()
         	valing_results['mse'] += batch_mse * batch_size
