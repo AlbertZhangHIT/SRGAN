@@ -45,10 +45,7 @@ print('# generator parameters:', sum(param.numel() for param in netG.parameters(
 netD = Discriminator().to(device)
 print('# discriminator parameters:', sum(param.numel() for param in netD.parameters()))
 
-generator_criterion = GeneratorLoss()
-
-if torch.cuda.is_available():
-    generator_criterion.cuda()
+generator_criterion = GeneratorLoss().to(device)
 
 optimizerG = optim.Adam(netG.parameters())
 optimizerD = optim.Adam(netD.parameters())
