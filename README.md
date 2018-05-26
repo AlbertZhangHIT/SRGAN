@@ -22,7 +22,7 @@ conda install opencv
 
 ### Train、Val Dataset
 The train and val datasets are sampled from [VOC2012](http://cvlab.postech.ac.kr/~mooyeol/pascal_voc_2012/).
-Train dataset has 16700 images and Val dataset has 425 images.
+Train dataset has 16700 images and Val dataset has 425 images. 
 Download the datasets from [here](https://pan.baidu.com/s/1c17nfeo), and then extract it into `data` directory.
 
 ### Test Image Dataset
@@ -42,13 +42,14 @@ The test video dataset are three trailers. Download the video dataset from
 
 ### Train
 ```
-python train.py
+python train.py --cuda 1
 
 optional arguments:
---crop_size                   training images crop size [default value is 88]
+--crop_size                   training images crop size [default value is 70]
 --upscale_factor              super resolution upscale factor [default value is 4](choices:[2, 4, 8])
 --num_epochs                  train epoch number [default value is 100]
 ```
+Since there is one image `2008_001823.jpg` in VOC2012 'JPEGImages' subdirectory in size `500x71`. I set the default `crop_size` to 70 to avoid `ConnectinoRefusedError` that caused by large cropsize(it leads to invalid value for `randint` when running `RandomCrop`).
 The output val super resolution images are on `training_results` directory.
 
 ### Test Benchmark Datasets
