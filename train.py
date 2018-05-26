@@ -120,7 +120,7 @@ for epoch in range(1, NUM_EPOCHS + 1):
 
             batch_mse = ((sr - hr) ** 2).data.mean()
             valing_results['mse'] += batch_mse * batch_size
-            batch_ssim = pytorch_ssim.ssim(sr, hr).data[0]
+            batch_ssim = pytorch_ssim.ssim(sr, hr).data.item()
             valing_results['ssims'] += batch_ssim * batch_size
             valing_results['psnr'] = 10 * log10(1 / (valing_results['mse'] / valing_results['batch_sizes']))
             valing_results['ssim'] = valing_results['ssims'] / valing_results['batch_sizes']
