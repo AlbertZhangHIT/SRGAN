@@ -5,7 +5,7 @@ I forked it from [leftthomas/SRGAN](https://github.com/leftthomas/SRGAN) and upd
 
 ## Requirements
 - [Anaconda](https://www.anaconda.com/download/)
-- PyTorch
+- PyTorch 0.4.0
 ```
 conda install pytorch torchvision -c pytorch
 ```
